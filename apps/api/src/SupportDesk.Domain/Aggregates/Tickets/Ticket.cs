@@ -103,6 +103,58 @@ public sealed class Ticket : AggregateRoot
     }
 
     /// <summary>
+    /// Sets the SLA deadline using the result of the configured triage rules.
+    /// </summary>
+    public void SetDueDate(DateTime dueAtUtc, DateTime nowUtc)
+    {
+        if (dueAtUtc <= nowUtc)
+        {
+            throw new ArgumentException(
+                "The SLA deadline must be in the future.",
+                nameof(dueAtUtc));
+        }
+
+        DueAtUtc = dueAtUtc;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    
+    /// <summary>
+    /// Increases priority by one level and applies the recalculated
+    /// SLA deadline and assignment.
+    /// </summary>
+    public void Escalate(
+        DateTime newDueAtUtc,
+        int? newAgentId,
+        DateTime nowUtc)
+    {
+        if (Status is TicketStatus.Resolved or TicketStatus.Closed)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} cannot be escalated because it is {Status}.");
+        }
+
+        if (Priority == TicketPriority.Critical)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} cannot be escalated because it is already Critical.");
+        }
+
+        if (newDueAtUtc <= nowUtc)
+        {
+            throw new ArgumentException(
+                "The new SLA deadline must be in the future.",
+                nameof(newDueAtUtc));
+        }
+
+        Priority = (TicketPriority)((int)Priority + 1);
+        DueAtUtc = newDueAtUtc;
+        AssignedAgentId = newAgentId;
+        UpdatedAtUtc = nowUtc;
+    }
+
+
+    /// <summary>
     /// Hands the ticket to an agent, or takes it back off them when <paramref name="agentId"/>
     /// is null. Whether the agent may take it is checked by the caller, which can see agents.
     /// </summary>

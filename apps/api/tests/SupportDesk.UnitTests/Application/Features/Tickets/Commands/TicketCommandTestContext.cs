@@ -10,6 +10,9 @@ using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
 using SupportDesk.Domain.Repositories;
 using SupportDesk.UnitTests.TestDoubles;
+using SupportDesk.Application.Services;
+using SupportDesk.Domain.Aggregates.Categories;
+
 
 namespace SupportDesk.UnitTests.Application.Features.Tickets.Commands;
 
@@ -44,11 +47,63 @@ internal sealed class TicketCommandTestContext
                 Category = new CategoryDto(1, "General", false)
             });
 
+        Customers.Setup(c => c.GetByIdAsync(
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, CancellationToken _) =>
+                new Customer(
+                    "Contoso Ltd",
+                    "support@contoso.example",
+                    null,
+                    CustomerTier.Premium,
+                    Clock.UtcNow));
+
+        Categories.Setup(c => c.GetByIdAsync(
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, CancellationToken _) =>
+                new Category(
+                    "General",
+                    requiresSpecialist: false,
+                    forcesCriticalPriority: false));
+
+        AgentAssignmentQuery.Setup(q => q.FindBestAgentIdAsync(
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int?)null);
+
         var getTicket = new GetTicketQueryHandler(TicketQueries.Object);
 
-        RaiseTicket = new RaiseTicketCommandHandler(
-            Tickets.Object, Customers.Object, Categories.Object, UnitOfWork.Object, Clock, getTicket,
-            NullLogger<RaiseTicketCommandHandler>.Instance);
+        var slaOptions = new SlaOptions
+            {
+                BaseWindowHours = new Dictionary<string, double>
+                {
+                    ["Low"] = 72,
+                    ["Medium"] = 24,
+                    ["High"] = 8,
+                    ["Critical"] = 4
+                },
+                PremiumCustomerMultiplier = 0.5,
+                MinimumWindowHours = 1,
+                AtRiskThresholdPercent = 25
+            };
+
+            var slaCalculator = new SlaCalculator(slaOptions);
+
+            var triageService = new TicketTriageService(
+                slaCalculator,
+                AgentAssignmentQuery.Object);
+
+            RaiseTicket = new RaiseTicketCommandHandler(
+                Tickets.Object,
+                Customers.Object,
+                Categories.Object,
+                UnitOfWork.Object,
+                Clock,
+                getTicket,
+                triageService,
+                NullLogger<RaiseTicketCommandHandler>.Instance);
 
         ChangeTicketStatus = new ChangeTicketStatusCommandHandler(Tickets.Object, UnitOfWork.Object, Clock, getTicket);
 
@@ -68,6 +123,8 @@ internal sealed class TicketCommandTestContext
     public Mock<IUnitOfWork> UnitOfWork { get; } = new();
 
     public Mock<ITicketQueries> TicketQueries { get; } = new();
+
+    public Mock<IAgentAssignmentQuery> AgentAssignmentQuery { get; } = new();
 
     public FixedClock Clock { get; } = new();
 

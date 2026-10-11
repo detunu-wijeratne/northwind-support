@@ -41,6 +41,9 @@ public static class DependencyInjection
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
 
+        // Automatic ticket assignment
+        services.AddScoped<IAgentAssignmentQuery, AgentAssignmentQuery>();
+
         services.AddScoped<SupportDbSeeder>();
 
         return services;

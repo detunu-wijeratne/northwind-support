@@ -4,6 +4,7 @@ using SupportDesk.Infrastructure;
 using SupportDesk.Presentation.Extensions;
 using SupportDesk.Presentation.Filters;
 using SupportDesk.Presentation.Middleware;
+using SupportDesk.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,9 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection("Sla").Get<SlaOptions>()
+    ?? throw new InvalidOperationException("Sla configuration is missing."));
 
 var app = builder.Build();
 

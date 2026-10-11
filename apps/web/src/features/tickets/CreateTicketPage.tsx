@@ -1,10 +1,13 @@
+
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { Spinner } from '../../components/Spinner';
 import { useReferenceData } from '../../hooks/useReferenceData';
+import { formatDateTime } from '../../lib/format';
 import type { TicketDetail } from '../../types/api';
 import { CreateTicketForm } from './components/CreateTicketForm';
+import { PriorityBadge } from './components/TicketBadges';
 
 export function CreateTicketPage() {
   const reference = useReferenceData();
@@ -22,17 +25,80 @@ export function CreateTicketPage() {
         </div>
       </header>
 
-      {reference.isLoading && <Spinner label="Loading customers and categories" />}
+      {reference.isLoading && (
+        <Spinner label="Loading customers and categories" />
+      )}
 
       {reference.error && (
-        <ErrorMessage message={reference.error} onRetry={() => void reference.reload()} />
+        <ErrorMessage
+          message={reference.error}
+          onRetry={() => void reference.reload()}
+        />
       )}
 
       {created && (
         <div className="card notice" role="status">
+          <h2>Ticket created successfully</h2>
+
           <p>
-            Raised <strong>{created.reference}</strong> for {created.customer.name}.
+            Raised <strong>{created.reference}</strong> for{' '}
+            {created.customer.name}.
           </p>
+
+          <h3>Automatic triage results</h3>
+
+          <dl className="summary">
+            <div>
+              <dt>Calculated priority</dt>
+              <dd>
+                <PriorityBadge priority={created.priority} />
+              </dd>
+            </div>
+
+            <div>
+              <dt>SLA deadline</dt>
+              <dd>{formatDateTime(created.dueAtUtc)}</dd>
+            </div>
+
+            <div>
+              <dt>Assigned agent</dt>
+              <dd>
+                {created.assignedAgent?.fullName ?? 'Unassigned'}
+              </dd>
+            </div>
+
+            <div>
+              <dt>Customer tier</dt>
+              <dd>{created.customer.tier}</dd>
+            </div>
+          </dl>
+
+          {created.triage ? (
+            <div className="triage-explanations">
+              <h3>Why these decisions were made</h3>
+
+              <p>
+                <strong>Priority:</strong>{' '}
+                {created.triage.priorityReason}
+              </p>
+
+              <p>
+                <strong>SLA:</strong>{' '}
+                {created.triage.slaReason}
+              </p>
+
+              <p>
+                <strong>Assignment:</strong>{' '}
+                {created.triage.assignmentReason}
+              </p>
+            </div>
+          ) : (
+            <p>
+              Detailed triage explanations were not included
+              in the server response.
+            </p>
+          )}
+
           <div className="button-row">
             <button
               type="button"
@@ -41,7 +107,12 @@ export function CreateTicketPage() {
             >
               Open {created.reference}
             </button>
-            <button type="button" className="button button--ghost" onClick={() => setCreated(undefined)}>
+
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setCreated(undefined)}
+            >
               Raise another
             </button>
           </div>

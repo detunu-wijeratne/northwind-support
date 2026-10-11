@@ -6,6 +6,8 @@ using SupportDesk.Application.Features.Tickets.Commands.ChangeTicketStatus;
 using SupportDesk.Application.Features.Tickets.Commands.RaiseTicket;
 using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
+using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
+using SupportDesk.Domain.Repositories;
 
 namespace SupportDesk.Presentation.Controllers;
 
@@ -39,6 +41,19 @@ public sealed class TicketsController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
+    
+    /// <summary>
+    /// Escalates an open, non-Critical ticket by one priority level.
+    /// </summary>
+    [HttpPost("{id:int}/escalate")]
+    public Task<EscalateTicketResponse> Escalate(
+        int id,
+        EscalateTicketRequest request,
+        [FromServices] EscalateTicketCommandHandler handler,
+        CancellationToken ct) =>
+        handler.HandleAsync(id, request, ct);
+
+
     /// <summary>Moves a ticket to another status.</summary>
     [HttpPatch("{id:int}/status")]
     public Task<TicketDetailDto> UpdateStatus(
@@ -56,4 +71,24 @@ public sealed class TicketsController : ControllerBase
         [FromServices] AssignTicketCommandHandler handler,
         CancellationToken ct) =>
         handler.HandleAsync(id, request, ct);
+
+    
+    /// <summary>
+    /// Returns the escalation history for a ticket, newest first.
+    /// </summary>
+    [HttpGet("{id:int}/escalations")]
+    public async Task<IReadOnlyList<EscalationDto>> GetEscalations(
+        int id,
+        [FromServices] GetTicketQueryHandler getTicket,
+        [FromServices] ITicketRepository tickets,
+        CancellationToken ct)
+    {
+        // Verify the ticket exists so an unknown ID returns 404.
+        await getTicket.HandleAsync(id, ct);
+
+        var history = await tickets.GetEscalationsAsync(id, ct);
+
+        return history.Select(EscalationDto.From).ToList();
+    }
+
 }
