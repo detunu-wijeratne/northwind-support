@@ -17,7 +17,6 @@ export function EscalationPanel({
   onEscalated,
 }: EscalationPanelProps) {
   const [reason, setReason] = useState('');
-  const [escalatedBy, setEscalatedBy] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,21 +26,15 @@ export function EscalationPanel({
     ticket.status === 'Closed';
 
   const trimmedReason = reason.trim();
-  const trimmedActor = escalatedBy.trim();
 
   const reasonValid =
     trimmedReason.length >= 5 &&
     trimmedReason.length <= 500;
 
-  const actorValid =
-    trimmedActor.length >= 1 &&
-    trimmedActor.length <= 100;
-
   const canSubmit =
     !cannotEscalate &&
     !pending &&
-    reasonValid &&
-    actorValid;
+    reasonValid;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,7 +49,6 @@ export function EscalationPanel({
     try {
       const payload: EscalateTicketPayload = {
         reason: trimmedReason,
-        escalatedBy: trimmedActor,
       };
 
       const response = await request<EscalateTicketResponse>(
@@ -79,11 +71,14 @@ export function EscalationPanel({
   }
 
   return (
-    <section className="card" aria-labelledby="escalation-heading">
+    <section
+      className="card"
+      aria-labelledby="escalation-heading"
+    >
       <h2 id="escalation-heading">Escalate ticket</h2>
 
       <p>
-        Increase this ticket's priority by one level and
+        Increase this ticket&apos;s priority by one level and
         recalculate its SLA deadline and assignment.
       </p>
 
@@ -120,34 +115,8 @@ export function EscalationPanel({
             />
 
             <p id="escalation-reason-help">
-              5–500 characters required. {trimmedReason.length}/500
-            </p>
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label htmlFor="escalated-by">
-              Escalated by
-            </label>
-
-            <input
-              id="escalated-by"
-              type="text"
-              value={escalatedBy}
-              onChange={(event) => {
-                setEscalatedBy(event.target.value);
-                setError(null);
-              }}
-              maxLength={100}
-              required
-              style={{
-                display: 'block',
-                width: '100%',
-                marginTop: '0.5rem',
-              }}
-            />
-            <p>
-              Temporary actor field until agent authentication
-              is implemented in Task 3.
+              5–500 characters required.{' '}
+              {trimmedReason.length}/500
             </p>
           </div>
 
@@ -157,7 +126,10 @@ export function EscalationPanel({
             </p>
           )}
 
-          <button type="submit" disabled={!canSubmit}>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+          >
             {pending ? 'Escalating...' : 'Escalate ticket'}
           </button>
         </form>

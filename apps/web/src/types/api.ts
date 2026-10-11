@@ -155,7 +155,6 @@ export interface ProblemDetails {
 
 export interface EscalateTicketPayload {
   reason: string;
-  escalatedBy: string;
 }
 
 export interface Escalation {
@@ -181,4 +180,21 @@ export interface TriageDecision {
   priorityReason: string;
   slaReason: string;
   assignmentReason: string;
+}
+
+export interface AuthAgent {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  expiresAtUtc: string;
+  agent: AuthAgent;
 }

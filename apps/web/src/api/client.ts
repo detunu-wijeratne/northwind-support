@@ -1,4 +1,5 @@
 import type { ProblemDetails } from '../types/api';
+import { clearSession, getSession } from '../features/auth/session';
 
 /**
  * Where the API lives. In development this stays '/api' and the Vite dev server proxies it
@@ -29,21 +30,36 @@ export class ApiError extends Error {
  * The single place that talks to the API. Returns parsed JSON, or throws an
  * {@link ApiError} that callers can show to the user.
  */
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+
+export async function request<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const session = getSession();
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(session
+        ? { Authorization: `Bearer ${session.token}` }
+        : {}),
       ...(init?.headers ?? {}),
     },
   });
+
+  if (response.status === 401 && !path.startsWith('/auth/login')) {
+    clearSession();
+  }
 
   if (!response.ok) {
     const problem = await readProblem(response);
 
     throw new ApiError(
       response.status,
-      problem?.detail ?? problem?.title ?? response.statusText,
+      problem?.detail ??
+        problem?.title ??
+        response.statusText,
       problem,
     );
   }
@@ -54,6 +70,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   return (await response.json()) as T;
 }
+
 
 /** Turns anything thrown by a fetch into a message worth showing a user. */
 export function toErrorMessage(error: unknown, fallback: string): string {

@@ -1,7 +1,22 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
 
-/** Application shell: the header, the navigation, and wherever the router puts the page. */
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useNavigate,
+} from 'react-router-dom';
+import { useAuth } from './features/auth/useAuth';
+
+/** Authenticated application shell. */
 export function App() {
+  const { agent, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    void navigate('/login', { replace: true });
+  }
+
   return (
     <div className="app">
       <header className="app__header">
@@ -13,6 +28,24 @@ export function App() {
           <NavLink to="/tickets">Tickets</NavLink>
           <NavLink to="/customers">Customers</NavLink>
         </nav>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}
+        >
+          <span>{agent?.fullName}</span>
+
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       <main className="app__main">

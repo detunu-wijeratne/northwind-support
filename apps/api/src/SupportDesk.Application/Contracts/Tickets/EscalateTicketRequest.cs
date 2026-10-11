@@ -7,6 +7,6 @@ public sealed class EscalateTicketRequest
 {
     public string Reason { get; set; } = string.Empty;
 
-    // Task 3 will replace this with the authenticated agent.
+    // Set by the API from the authenticated agent's JWT, never from client input.
     public string EscalatedBy { get; set; } = string.Empty;
 }

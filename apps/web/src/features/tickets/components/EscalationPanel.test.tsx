@@ -2,11 +2,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, request } from '../../../api/client';
-import type { TicketDetail } from '../../../types/api';
+import type {
+  EscalateTicketResponse,
+  TicketDetail,
+} from '../../../types/api';
 import { EscalationPanel } from './EscalationPanel';
 
 vi.mock('../../../api/client', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../api/client')>();
+  const original =
+    await importOriginal<typeof import('../../../api/client')>();
 
   return {
     ...original,
@@ -58,13 +62,10 @@ describe('EscalationPanel', () => {
       <EscalationPanel ticket={ticket} onEscalated={onEscalated} />,
     );
 
-    fireEvent.change(screen.getByLabelText('Reason for escalation'), {
-      target: { value: 'abc' },
-    });
-
-    fireEvent.change(screen.getByLabelText('Escalated by'), {
-      target: { value: 'Test Agent' },
-    });
+    fireEvent.change(
+      screen.getByLabelText('Reason for escalation'),
+      { target: { value: 'abc' } },
+    );
 
     const button = screen.getByRole('button', {
       name: 'Escalate ticket',
@@ -78,44 +79,101 @@ describe('EscalationPanel', () => {
     expect(onEscalated).not.toHaveBeenCalled();
   });
 
-  it('shows an HTTP 409 error without updating the ticket', async () => {
+  it('sends only the reason and refreshes the ticket after success', async () => {
     const onEscalated = vi.fn().mockResolvedValue(undefined);
 
-    mockedRequest.mockRejectedValueOnce(
-      new ApiError(
-        409,
-        'This ticket cannot be escalated.',
-      ),
-    );
+    const updatedTicket: TicketDetail = {
+      ...ticket,
+      priority: 'Critical',
+    };
+
+    const response = {
+      ticket: updatedTicket,
+      escalation: {
+        id: 3,
+        ticketId: 41,
+        fromPriority: 'High',
+        toPriority: 'Critical',
+        reason: 'Customer issue requires immediate attention.',
+        escalatedBy: 'Alex Turner',
+      },
+    } as EscalateTicketResponse;
+
+    mockedRequest.mockResolvedValueOnce(response);
 
     render(
       <EscalationPanel ticket={ticket} onEscalated={onEscalated} />,
     );
 
-    fireEvent.change(screen.getByLabelText('Reason for escalation'), {
-      target: {
-        value: 'Customer operations are significantly affected.',
-      },
-    });
+    expect(
+      screen.queryByLabelText('Escalated by'),
+    ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Escalated by'), {
-      target: { value: 'Test Agent' },
-    });
+    fireEvent.change(
+      screen.getByLabelText('Reason for escalation'),
+      {
+        target: {
+          value: 'Customer issue requires immediate attention.',
+        },
+      },
+    );
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Escalate ticket' }),
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('alert'),
-      ).toHaveTextContent('This ticket cannot be escalated.');
+      expect(onEscalated).toHaveBeenCalledWith(updatedTicket);
     });
 
     expect(mockedRequest).toHaveBeenCalledWith(
       '/tickets/41/escalate',
       expect.objectContaining({
         method: 'POST',
+        body: JSON.stringify({
+          reason: 'Customer issue requires immediate attention.',
+        }),
+      }),
+    );
+  });
+
+  it('shows an HTTP 409 error without updating the ticket', async () => {
+    const onEscalated = vi.fn().mockResolvedValue(undefined);
+
+    mockedRequest.mockRejectedValueOnce(
+      new ApiError(409, 'This ticket cannot be escalated.'),
+    );
+
+    render(
+      <EscalationPanel ticket={ticket} onEscalated={onEscalated} />,
+    );
+
+    fireEvent.change(
+      screen.getByLabelText('Reason for escalation'),
+      {
+        target: {
+          value: 'Customer operations are significantly affected.',
+        },
+      },
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Escalate ticket' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'This ticket cannot be escalated.',
+      );
+    });
+
+    expect(mockedRequest).toHaveBeenCalledWith(
+      '/tickets/41/escalate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          reason: 'Customer operations are significantly affected.',
+        }),
       }),
     );
 
@@ -138,9 +196,7 @@ describe('EscalationPanel', () => {
       />,
     );
 
-    expect(
-      screen.getByText(/already Critical/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/already Critical/i)).toBeInTheDocument();
 
     expect(
       screen.queryByRole('button', { name: 'Escalate ticket' }),
@@ -159,9 +215,7 @@ describe('EscalationPanel', () => {
       />,
     );
 
-    expect(
-      screen.getByText(/Resolved/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Resolved/i)).toBeInTheDocument();
 
     expect(
       screen.queryByRole('button', { name: 'Escalate ticket' }),

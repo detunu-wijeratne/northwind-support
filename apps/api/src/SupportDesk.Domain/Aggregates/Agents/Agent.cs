@@ -31,6 +31,19 @@ public sealed class Agent : AggregateRoot
 
     public string Email { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Securely hashed and salted password.
+    /// Never stores the original password.
+    /// </summary>
+    public string PasswordHash { get; private set; } = string.Empty;
+
+    /// <summary>Updates the password hash produced by ASP.NET Core Identity.</summary>
+    public void SetPasswordHash(string passwordHash)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+        PasswordHash = passwordHash;
+    }
+
     /// <summary>Inactive agents keep their history but take no new work.</summary>
     public bool IsActive { get; private set; }
 

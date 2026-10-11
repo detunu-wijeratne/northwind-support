@@ -5,6 +5,7 @@ using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using Microsoft.AspNetCore.Identity;
 
 namespace SupportDesk.Infrastructure.Data;
 
@@ -17,14 +18,44 @@ namespace SupportDesk.Infrastructure.Data;
 /// Every aggregate is built through its own behaviour. The two historical values no behaviour
 /// produces - a ticket's last update and its due date - are set through EF Core directly.
 /// </remarks>
-public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<SupportDbSeeder> logger)
+public sealed class SupportDbSeeder(
+    SupportDbContext db,
+    IClock clock,
+    ILogger<SupportDbSeeder> logger)
 {
+    // Explicitly for local demonstration accounts.
+    private const string DevelopmentPassword = "NorthwindDev2026!";
+    // This fixture must only be invoked in the Development environment.
+    // Production credentials must be provisioned separately.
+
+    private static readonly PasswordHasher<Agent> PasswordHasher = new();
     /// <summary>Seeds the database, unless it already has tickets in it.</summary>
     public async Task SeedAsync(CancellationToken ct = default)
     {
         if (await db.Set<Ticket>().AnyAsync(ct))
         {
-            logger.LogInformation("Seed data already present; skipping.");
+            // Existing development databases need credentials too.
+            // Never overwrite accounts that already have password hashes.
+            var agentsWithoutPasswords = await db.Set<Agent>()
+                .Where(agent => agent.PasswordHash == "")
+                .ToListAsync(ct);
+
+            foreach (var agent in agentsWithoutPasswords)
+            {
+                agent.SetPasswordHash(
+                    PasswordHasher.HashPassword(agent, DevelopmentPassword));
+            }
+
+            if (agentsWithoutPasswords.Count > 0)
+            {
+                await db.SaveChangesAsync(ct);
+
+                logger.LogInformation(
+                    "Initialized development password hashes for {Count} existing agents.",
+                    agentsWithoutPasswords.Count);
+            }
+
+            logger.LogInformation("Seed data already present; skipping ticket seeding.");
             return;
         }
 
@@ -68,22 +99,45 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
         new("Tailspin Toys", "service@tailspin.example", "+353 1 555 0105", CustomerTier.Standard, now.AddDays(-180)),
         new("Wide World Importers", "support@wideworld.example", "+65 6555 0106", CustomerTier.Premium, now.AddDays(-90))
     ];
+private static List<Agent> SeedAgents(DateTime now)
+{
+    var yuki = new Agent(
+        "Yuki Tanaka",
+        "yuki.tanaka@northwind-support.example",
+        8,
+        now.AddDays(-600));
 
-    private static List<Agent> SeedAgents(DateTime now)
+    yuki.Deactivate();
+
+    List<Agent> agents =
+    [
+        new("Alex Turner", "alex.turner@northwind-support.example",
+            10, now.AddDays(-500)),
+
+        new("Ben Osei", "ben.osei@northwind-support.example",
+            8, now.AddDays(-460)),
+
+        new("Priya Nair", "priya.nair@northwind-support.example",
+            8, now.AddDays(-400)),
+
+        new("Sara Lindqvist", "sara.lindqvist@northwind-support.example",
+            6, now.AddDays(-280)),
+
+        new("Marcus Doyle", "marcus.doyle@northwind-support.example",
+            6, now.AddDays(-200)),
+
+        yuki
+    ];
+
+    foreach (var agent in agents)
     {
-        var yuki = new Agent("Yuki Tanaka", "yuki.tanaka@northwind-support.example", 8, now.AddDays(-600));
-        yuki.Deactivate();
-
-        return
-        [
-            new("Alex Turner", "alex.turner@northwind-support.example", 10, now.AddDays(-500)),
-            new("Ben Osei", "ben.osei@northwind-support.example", 8, now.AddDays(-460)),
-            new("Priya Nair", "priya.nair@northwind-support.example", 8, now.AddDays(-400)),
-            new("Sara Lindqvist", "sara.lindqvist@northwind-support.example", 6, now.AddDays(-280)),
-            new("Marcus Doyle", "marcus.doyle@northwind-support.example", 6, now.AddDays(-200)),
-            yuki
-        ];
+        agent.SetPasswordHash(
+            PasswordHasher.HashPassword(agent, DevelopmentPassword));
     }
+
+    return agents;
+}
+
 
     /// <summary>
     /// Who can handle what:

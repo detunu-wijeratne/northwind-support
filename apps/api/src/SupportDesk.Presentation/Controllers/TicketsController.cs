@@ -8,6 +8,8 @@ using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
 using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 using SupportDesk.Domain.Repositories;
+using System.Security.Claims;
+
 
 namespace SupportDesk.Presentation.Controllers;
 
@@ -46,12 +48,30 @@ public sealed class TicketsController : ControllerBase
     /// Escalates an open, non-Critical ticket by one priority level.
     /// </summary>
     [HttpPost("{id:int}/escalate")]
-    public Task<EscalateTicketResponse> Escalate(
+    public async Task<ActionResult<EscalateTicketResponse>> Escalate(
         int id,
-        EscalateTicketRequest request,
+        [FromBody] EscalationRequest request,
         [FromServices] EscalateTicketCommandHandler handler,
-        CancellationToken ct) =>
-        handler.HandleAsync(id, request, ct);
+        CancellationToken ct)
+    {
+        var agentName = User.FindFirstValue(ClaimTypes.Name);
+
+        if (string.IsNullOrWhiteSpace(agentName))
+        {
+            return Unauthorized();
+        }
+
+        var command = new EscalateTicketRequest
+        {
+            Reason = request.Reason,
+            EscalatedBy = agentName
+        };
+
+        var result = await handler.HandleAsync(id, command, ct);
+
+        return Ok(result);
+    }
+
 
 
     /// <summary>Moves a ticket to another status.</summary>
@@ -90,5 +110,8 @@ public sealed class TicketsController : ControllerBase
 
         return history.Select(EscalationDto.From).ToList();
     }
+
+public sealed record EscalationRequest(string Reason);
+
 
 }
