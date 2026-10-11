@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using SupportDesk.Domain.Aggregates.Agents;
+using SupportDesk.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using SupportDesk.Presentation.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,6 +83,9 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
+// Health check verifies that SQL Server is reachable.
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 
 var app = builder.Build();
 
@@ -97,6 +103,10 @@ if (app.Environment.IsDevelopment())
 app.UseCors(FrontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Public health endpoint; authorization is not required.
+app.MapHealthChecks("/health")
+    .AllowAnonymous();
 
 app.MapControllers();
 

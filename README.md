@@ -1,128 +1,30 @@
 # Northwind Support Desk
 
-A support ticket management system: raise tickets, search and filter them, assign them to agents,
-and move them through their lifecycle.
+A support ticket management system built with **.NET 10 Web API**, **React 19 / TypeScript**, **EF Core**, and **SQL Server**. This fork completes the candidate assignment's defect fix, filtering, ticket triage/escalation, agent authentication, and Docker API deployment.
 
-**.NET 10 Web API** + **React 19 / TypeScript** + **SQL Server**, in one monorepo.
+## What was implemented
 
----
-
-## The assignment
-
-You are joining a team that already has this app working. Complete the tasks **in order**.
-Full requirements are in **[`ASSIGNMENT_CANDIDATE.md`](ASSIGNMENT_CANDIDATE.md)**.
-
-| # | Task | Done looks like | Effort |
-| --- | --- | --- | --- |
-| 1 | **Fix a defect, add server-side filtering** | Root cause fixed with a regression test; every list filter applied in the database with a correct count | ~2.5 h |
-| 2 | **Ticket escalation & assignment** | Automatic triage on create, escalation with history, SLA status, UI for all of it | ~7 h |
-| 3 | **Login and authentication** | Agents sign in; API rejects unauthenticated calls; login UI | ~4 h |
-| 4 | **Dockerise the API** *(optional)* | `docker compose up` gives a migrated, seeded API with no baked-in secret | ~1.5 h |
-
-### Guidance
-
-- **Time: 2 days.** Honestly marking a task "not finished" beats rushing all of them.
-- **Fork** this repo to your own GitHub account and work there. **Do not push to the original.**
-- **AI tools are allowed.** You must understand and be able to defend every line you submit.
-- **Commit as you go** and keep the real history. Commit the Task 1 defect fix and the filtering
-  separately from each other and from the feature work. A single squashed commit is not accepted.
-- **Where the spec is ambiguous**, make a decision, write it down in the README, and move on.
-- **Out of scope:** registration, password reset, roles, OAuth/SSO, refresh tokens, MFA,
-  notifications, CI, caching, visual redesign. Mention them under *Known limitations* instead.
-
-### Submission
-
-1. Update this **README** with what you built, your design decisions (chosen, rejected and why),
-   the defect's root cause, dev login credentials, how to run and test it, AI usage, and known
-   limitations. A reviewer must be able to run it without asking you anything.
-2. Add an **APPROACH.md** explaining your approach and thought process for each task.
-3. Commit both, then send us the **link to your fork**, the **dev login credentials**, and a
-   **rough note of time spent** on what. (If the fork is private, add the reviewers as collaborators.)
-
----
-
-## Quick start
-
-**Prerequisites:** .NET SDK 10 (`global.json`), Node.js 22 (`.nvmrc`; 20.19+ works), Docker.
-
-```bash
-cp .env.example .env          # optional, every value has a working default
-npm install                   # installs the web app
-npm run db:up                 # SQL Server 2022 in Docker on localhost:1433
-npm run api                   # terminal 1: migrates, seeds, then serves the API
-npm run web                   # terminal 2: React dev server
-```
-
-| What | Where |
+| Task | Implementation |
 | --- | --- |
-| Web app | http://localhost:5173 |
-| API | https://localhost:7043 (also http://localhost:5043) |
-| Swagger | https://localhost:7043/swagger |
+| 1 — Defect and filtering | Fixed stale ticket-list filters at the request trigger, added a regression test, and applied combined filters in SQL before counting and pagination. |
+| 2 — Triage and escalation | Automatic category/priority rules, configurable SLA windows, deterministic eligible-agent assignment, escalation history, SLA indicator/filter, and ticket-detail/create UI. |
+| 3 — Authentication | Salted password hashes for agents, JWT login, `/api/auth/me`, centrally protected API, JWT-derived escalation actor, React login/logout, and protected routes. |
+| 4 — Docker | Multi-stage .NET 10 API image, non-root execution, SQL Server health dependency, runtime environment configuration, automatic development migrations/seeding, and public database health endpoint. |
 
-In Development the API applies migrations and seeds demo data on startup. **Never commit real
-credentials.**
+## Setup and development login
 
-**Visual Studio 2026:** run `npm run db:up`, open `SupportDesk.sln`, set
-**SupportDesk.Presentation** as the startup project, and press F5 on the **https** profile.
+**Prerequisites:** .NET 10 SDK, Node.js 20.19+ (Node 22 recommended), npm, and Docker Desktop.
 
-## Tests
+**Development-only seeded account:**
 
-```bash
-npm test                      # dotnet test, then the web tests (Vitest)
-```
+- Email: `alex.turner@northwind-support.example`
+- Password: `NorthwindDev2026!`
 
-Both pass on a clean checkout and neither needs a database.
+The password is a **local test fixture** hashed when demo agents are seeded; do not reuse it for a real deployment. An inactive seeded agent cannot sign in.
 
-## Commands
+### Docker: recommended way to run the API
 
-| Command | What it does |
-| --- | --- |
-| `npm run db:up` / `db:down` / `db:reset` | Start / stop / wipe SQL Server |
-| `npm run api` / `npm run web` | Run the API / the React app |
-| `npm run build` | Build both |
-| `npm run lint` / `typecheck` / `format` | Web lint and types / `dotnet format` |
-| `npm run ef -- migrations add <Name>` | Add an EF Core migration |
-
-## API at a glance
-
-| Endpoint | Description |
-| --- | --- |
-| `GET /api/tickets` | Paged list with `search`, `status`, `priority`, `categoryId`, `customerId`, `assignedAgentId`, `unassignedOnly`, `sortBy`, `sortDirection`. **Filters are accepted but not applied yet** (Task 1). |
-| `GET /api/tickets/{id}` | One ticket |
-| `POST /api/tickets` | Create a ticket |
-| `PATCH /api/tickets/{id}/status` · `/assignment` | Change status / assignee |
-| `GET /api/customers` · `/api/agents` · `/api/categories` | Reference data |
-
-Errors are `ProblemDetails`: `400` validation, `404` not found, `409` conflict or business rule.
-
-**Seed data:** 5 categories, 6 customers (3 Premium), 6 agents (one inactive, one at their limit)
-and 40 tickets across every status, priority and SLA state.
-
-## Troubleshooting
-
-| Symptom | Fix |
-| --- | --- |
-| API cannot reach the database | `npm run db:up`, wait ~20 s, check `docker compose ps` |
-| Port 1433 already in use | Change the port in `docker-compose.yml` and `.env` |
-| Browser warns about the certificate | `dotnet dev-certs https --trust`, or use the web app, which proxies |
-| Web app shows "Unable to load tickets" | The API is not running, or `VITE_API_PROXY_TARGET` points at the wrong port |
-| SQL Server slow on Apple Silicon | Enable Rosetta in Docker Desktop → Settings → General |
-
-
-## Docker Deployment
-
-### Prerequisites
-
-- Docker Desktop with Docker Compose
-- Node.js and npm for running the React frontend
-
-### Environment Configuration
-
-Copy `.env.example` to `.env` in the repository root.
-
-Configure `MSSQL_SA_PASSWORD` and `Jwt__Key` in `.env`. The JWT signing key must contain at least 32 UTF-8 bytes. Use a randomly generated value and never commit real credentials.
-
-For example, generate a JWT key in PowerShell:
+From the repository root, copy `.env.example` to `.env`. Set `MSSQL_SA_PASSWORD` and a **unique** `Jwt__Key` of at least 32 UTF-8 bytes in the local `.env`. Keep `.env` untracked. Generate a signing key in PowerShell:
 
 ```powershell
 $bytes = New-Object byte[] 64
@@ -132,47 +34,54 @@ $rng.Dispose()
 [Convert]::ToBase64String($bytes)
 ```
 
-Copy the generated value into the local `.env` file as `Jwt__Key`.
-
-### Start the Application
-
-From the repository root:
+Copy that output into `.env` as `Jwt__Key=<generated-value>` (without angle brackets). Run:
 
 ```powershell
 docker compose up -d --build
+docker compose ps
 ```
 
-Docker Compose starts SQL Server and the .NET 10 API. The API waits for SQL Server to become healthy before starting.
+The API is exposed at `http://localhost:5080`, Swagger at `http://localhost:5080/swagger`, and the anonymous database check at `http://localhost:5080/health`. SQL Server is reached by the Compose hostname `sqlserver` rather than `localhost`. On Development startup, the API applies EF Core migrations and seeds demo data; existing data is preserved.
 
-The API runs on port `8080` inside the container and is exposed on `http://localhost:5080`.
-
-Development mode enables Swagger and automatic database migration and demo-data seeding.
-
-Swagger: http://localhost:5080/swagger
-
-### Run the React Frontend
-
-In another terminal:
+Start the React frontend separately (the web app is intentionally not Dockerized):
 
 ```powershell
+npm install
 $env:VITE_API_PROXY_TARGET = "http://localhost:5080"
 npm run web
 ```
 
-Open the Vite URL displayed in the terminal.
+Open the Vite URL (normally `http://localhost:5173`) and sign in. The frontend sends the JWT on protected API calls. With no token, `/api/tickets` returns 401; `/health` remains public.
 
-### Verify the Deployment
+**Running the API directly:** `npm run db:up` starts SQL Server. Set `Jwt__Key` and `Jwt__Issuer=NorthwindSupport` in the API process environment before `npm run api`; ASP.NET Core `dotnet run` does **not** read `.env` automatically. Set `VITE_API_PROXY_TARGET` to the URL used by that API when starting the web app.
 
-```powershell
-docker compose ps
-docker compose logs api --tail=50
-```
+## API and business rules
 
-Verify that SQL Server is healthy, the API remains running, and Swagger is accessible.
+- `POST /api/auth/login` is public and returns a JWT, expiry and agent details; `GET /api/auth/me` requires a JWT. Invalid email/password have the same 401 response; inactive agents cannot log in.
+- `GET /api/tickets` supports exact `status`, `priority`, `categoryId`, `customerId`, `assignedAgentId`, `unassignedOnly`, trimmed `search` (title/reference/customer), and `slaStatus`. Filters combine with **AND**, run in SQL **before** `totalCount`, sorting and paging, and do not filter the returned page in memory.
+- `POST /api/tickets` automatically determines priority, SLA due date and an eligible agent, returning explanations. Security/outage-style categories use **category flags**, not hard-coded category names.
+- SLA base windows are **Critical 4h, High 8h, Medium 24h, Low 72h**. Premium customers get half the window, with a minimum of 1h. Windows, multiplier and at-risk threshold come from configuration. SLA status is calculated, not persisted.
+- Assignment considers active agents, required category specializations and maximum open-ticket limits; ties are deterministic. A ticket may be created unassigned with an explanation if no agent is eligible.
+- `POST /api/tickets/{id}/escalate` increases priority one level, recalculates SLA and assignment, and saves immutable history. The request supplies only a 5–500 character reason; `escalatedBy` is derived from the authenticated JWT. Critical or resolved/closed tickets cannot be escalated. `GET /api/tickets/{id}/escalations` returns the history.
+- `GET /health` reports database reachability, is anonymous, and returns 200 when healthy or 503 when unhealthy.
 
-An unauthenticated request to `/api/tickets` should return HTTP 401.
+### Technical decisions and trade-offs
 
-### Automated Tests
+**Defect (DEFECT-117):** The ticket filters and the request-triggering state were out of sync: a status change did not initiate a new request until another input changed. The fix connects every filter change to the query request while retaining debouncing for search. The regression test asserts the request itself, rather than hiding the issue with in-memory filtering or a forced remount.
+
+**Filtering:** Keep query composition in EF Core/IQueryable, adding one predicate per supplied filter before count/pagination. This allows a new filter such as `slaStatus` without restructuring the data path. Review the EF-generated SQL/logging to confirm predicates, count and paging remain database-side; avoid a large `ToList()` before filtering.
+
+**Rules and patterns:** Shared triage/SLA/assignment services keep business logic out of controllers (**service pattern / single responsibility**). Repository and unit-of-work boundaries separate persistence and business behavior. An injectable clock permits deterministic time-boundary testing. We rejected hard-coded category-name checks and frontend-calculated assignment because both duplicate or weaken the source of truth.
+
+**Authentication:** Credentials are stored as a `PasswordHash` on `Agent`, avoiding a separate users table where the agent already represents the sign-in identity. ASP.NET Core `PasswordHasher` produces salted, non-reversible hashes. A central authorization fallback policy protects controllers; login and Swagger remain public. The JWT signing key is supplied at runtime, not compiled into the image. Token lifetime is **60 minutes**. The React token is kept in **sessionStorage** (survives reloads in the same tab, generally not a new browser session); unlike an HttpOnly cookie, it is readable by JavaScript if XSS occurs. Protected responses returning 401 clear the session and redirect to login.
+
+**Database:** EF migrations add hashed agent credentials and ticket escalation records, including an indexed escalation TicketId foreign key for efficient history lookup. Relationships, field lengths and delete behavior are configured in EF Core mappings. SQL read queries favor narrow projections / `AsNoTracking` where applicable.
+
+**Production migrations:** Automatic migration/seeding at application startup is intentionally **Development-only** for this assessment. A real deployment should apply reviewed migrations through a controlled release job/process, with backups and rollout coordination, rather than letting every application instance migrate a shared production database.
+
+## Tests and Docker verification
+
+Run these from the repository root:
 
 ```powershell
 dotnet test
@@ -181,16 +90,32 @@ npm run lint
 npm run test --workspace apps/web
 ```
 
-### Troubleshooting
+Last verified: **53 .NET tests** and **17 React tests**, all passing. Coverage includes ticket filters, SLA/triage/escalation behavior and boundaries, form rejection/409 handling, token attachment, clearing authentication on 401, and login requests without a stored token. Manual browser checks verified login, logout, and redirect/return-to-page behavior. No production load, penetration or cross-browser testing has been performed.
 
-- If the API cannot connect to SQL Server, check `docker compose ps` and the container logs.
-- If the API fails at startup, ensure `Jwt__Key` is configured correctly.
-- If port `5080` is already in use, stop the locally running API before starting Docker.
-- If Docker image builds fail, inspect the build output and check the Dockerfile's copied project configuration files.
-- To stop the containers without removing database data, run `docker compose down`.
+Docker checks performed:
 
-Do not use `docker compose down -v` unless you intentionally want to delete the database volume.
+| Check | Result |
+| --- | --- |
+| `docker compose up -d --build` | API built/running; SQL Server healthy |
+| `GET http://localhost:5080/health` | **200 Healthy**; database reachable |
+| `GET /api/tickets` without JWT | **401 Unauthorized** |
+| `docker compose exec api whoami` | **`app`**, not root |
+| Repeat build after a source change | NuGet `restore` layer shown as **CACHED** |
+| API image (`northwind-support-api:latest`) | **454,675,921 bytes ≈ 454.7 MB** |
+| .NET SDK image (`mcr.microsoft.com/dotnet/sdk:10.0`) | **1,303,343,059 bytes ≈ 1,303.3 MB** |
 
-### Security Notes
+The API runtime image is approximately **848.7 MB (65.1%) smaller** than the SDK image. Build and runtime use separate .NET 10 images. The API runs on HTTP port **8080** as a non-root user; no signing secret or certificate is baked into the image.
 
-The provided Compose configuration uses Development mode and demo credentials for local assessment purposes only. For production, use managed secrets, production database credentials, HTTPS, and an appropriate deployment configuration.
+**Fresh-volume verification:** The application is configured to migrate and seed an empty SQL database in Development. A destructive `docker compose down -v` fresh-volume test has **not been independently recorded here**; do not claim it was verified unless you run it. It deletes the database volume, so back up any data first or use an isolated temporary Compose project.
+
+Troubleshooting: Run `docker compose logs api --tail=100` and `docker compose ps` if startup fails. Ensure `.env` has `Jwt__Key`, verify ports `1433` and `5080` are free, and check database health. Use `docker compose down` to stop containers **without removing the SQL volume**.
+
+## AI assistance and known limitations
+
+AI assistance was used to interpret acceptance criteria, draft code and tests, troubleshoot TypeScript imports and Docker build errors, and improve documentation. Suggestions were reviewed against the assignment and validated with compiler checks, automated tests, API calls and Docker logs. For example, the first Dockerfile omitted `Directory.Build.props`, which caused `NETSDK1013`; adding it before restore corrected the build. The first database health-check suggestion used an unavailable extension method; it was replaced with an asynchronous `IHealthCheck` backed by `CanConnectAsync`. The implemented behavior—not AI output alone—was treated as the evidence of completion.
+
+Known limitations: This is a development assessment rather than a production-ready identity or hosting system. It intentionally omits registration, password reset, refresh tokens, MFA, roles/permissions, rate limiting, background jobs, CI/CD, frontend containerization and HTTPS termination in Docker. Production would need secret management, HTTPS at the ingress, hardened database permissions, cookie-based or other appropriately protected authentication, observability, and a controlled migration process.
+
+## Submission
+
+Submit the **GitHub fork URL**, the development login credentials above, and an **honest approximate time breakdown** for Tasks 1–4. Keep the distinct commits for the Task 1 defect and filtering work. If the fork is private, grant reviewers access. See `ASSIGNMENT_CANDIDATE.md` for assignment details. If the repository's submission instructions require `APPROACH.md`, submit that file separately as well.
