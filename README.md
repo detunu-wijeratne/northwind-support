@@ -107,3 +107,90 @@ and 40 tickets across every status, priority and SLA state.
 | Browser warns about the certificate | `dotnet dev-certs https --trust`, or use the web app, which proxies |
 | Web app shows "Unable to load tickets" | The API is not running, or `VITE_API_PROXY_TARGET` points at the wrong port |
 | SQL Server slow on Apple Silicon | Enable Rosetta in Docker Desktop → Settings → General |
+
+
+## Docker Deployment
+
+### Prerequisites
+
+- Docker Desktop with Docker Compose
+- Node.js and npm for running the React frontend
+
+### Environment Configuration
+
+Copy `.env.example` to `.env` in the repository root.
+
+Configure `MSSQL_SA_PASSWORD` and `Jwt__Key` in `.env`. The JWT signing key must contain at least 32 UTF-8 bytes. Use a randomly generated value and never commit real credentials.
+
+For example, generate a JWT key in PowerShell:
+
+```powershell
+$bytes = New-Object byte[] 64
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+[Convert]::ToBase64String($bytes)
+```
+
+Copy the generated value into the local `.env` file as `Jwt__Key`.
+
+### Start the Application
+
+From the repository root:
+
+```powershell
+docker compose up -d --build
+```
+
+Docker Compose starts SQL Server and the .NET 10 API. The API waits for SQL Server to become healthy before starting.
+
+The API runs on port `8080` inside the container and is exposed on `http://localhost:5080`.
+
+Development mode enables Swagger and automatic database migration and demo-data seeding.
+
+Swagger: http://localhost:5080/swagger
+
+### Run the React Frontend
+
+In another terminal:
+
+```powershell
+$env:VITE_API_PROXY_TARGET = "http://localhost:5080"
+npm run web
+```
+
+Open the Vite URL displayed in the terminal.
+
+### Verify the Deployment
+
+```powershell
+docker compose ps
+docker compose logs api --tail=50
+```
+
+Verify that SQL Server is healthy, the API remains running, and Swagger is accessible.
+
+An unauthenticated request to `/api/tickets` should return HTTP 401.
+
+### Automated Tests
+
+```powershell
+dotnet test
+npm run typecheck
+npm run lint
+npm run test --workspace apps/web
+```
+
+### Troubleshooting
+
+- If the API cannot connect to SQL Server, check `docker compose ps` and the container logs.
+- If the API fails at startup, ensure `Jwt__Key` is configured correctly.
+- If port `5080` is already in use, stop the locally running API before starting Docker.
+- If Docker image builds fail, inspect the build output and check the Dockerfile's copied project configuration files.
+- To stop the containers without removing database data, run `docker compose down`.
+
+Do not use `docker compose down -v` unless you intentionally want to delete the database volume.
+
+### Security Notes
+
+The provided Compose configuration uses Development mode and demo credentials for local assessment purposes only. For production, use managed secrets, production database credentials, HTTPS, and an appropriate deployment configuration.
